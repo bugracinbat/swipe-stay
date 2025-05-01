@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { StyleSheet, View, Dimensions, Text, Image } from "react-native";
-import { FAB, IconButton } from "react-native-paper";
+import { FAB, IconButton, Surface } from "react-native-paper";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -12,6 +12,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../App";
 import { useProperty } from "../context/PropertyContext";
+import { useFilter } from "../context/FilterContext";
 
 type HomeScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Home">;
@@ -22,18 +23,53 @@ const mockProperties = [
   {
     id: "1",
     title: "Modern Apartment",
-    price: "$1,500/month",
+    price: "$1,500",
     location: "Downtown",
     image: "https://picsum.photos/400/600",
+    type: "apartment",
+    bedrooms: 2,
+    bathrooms: 2,
   },
   {
     id: "2",
     title: "Cozy Studio",
-    price: "$1,200/month",
+    price: "$1,200",
     location: "Westside",
     image: "https://picsum.photos/400/601",
+    type: "studio",
+    bedrooms: 1,
+    bathrooms: 1,
   },
-  // Add more mock properties as needed
+  {
+    id: "3",
+    title: "Luxury House",
+    price: "$3,500",
+    location: "Uptown",
+    image: "https://picsum.photos/400/602",
+    type: "house",
+    bedrooms: 4,
+    bathrooms: 3,
+  },
+  {
+    id: "4",
+    title: "Downtown Apartment",
+    price: "$2,000",
+    location: "Downtown",
+    image: "https://picsum.photos/400/603",
+    type: "apartment",
+    bedrooms: 3,
+    bathrooms: 2,
+  },
+  {
+    id: "5",
+    title: "Modern Studio",
+    price: "$1,800",
+    location: "Midtown",
+    image: "https://picsum.photos/400/604",
+    type: "studio",
+    bedrooms: 1,
+    bathrooms: 1,
+  },
 ];
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
@@ -44,8 +80,107 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const { addLikedProperty, likedProperties } = useProperty();
+  const {
+    priceRange,
+    propertyType,
+    searchQuery,
+    location,
+    bedrooms,
+    bathrooms,
+    amenities,
+  } = useFilter();
 
-  const currentProperty = mockProperties[currentIndex];
+  // Add header filter button
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerStyle: {
+        backgroundColor: "#FF3366",
+      },
+      headerTintColor: "#fff",
+      headerTitleStyle: {
+        fontWeight: "600",
+        fontSize: 18,
+      },
+      headerRight: () => (
+        <View style={{ flexDirection: "row" }}>
+          <IconButton
+            icon="heart"
+            iconColor="#fff"
+            size={24}
+            onPress={() => navigation.navigate("SavedProperties")}
+          />
+          <IconButton
+            icon="filter-variant"
+            iconColor="#fff"
+            size={24}
+            onPress={() => navigation.navigate("Filter")}
+          />
+        </View>
+      ),
+    });
+  }, [navigation]);
+
+  // Filter properties based on current filters
+  const filteredProperties = useMemo(() => {
+    return mockProperties.filter((property) => {
+      const propertyPrice = parseInt(property.price.replace(/[^0-9]/g, ""));
+      const matchesPrice =
+        propertyPrice >= priceRange.min && propertyPrice <= priceRange.max;
+      const matchesType =
+        propertyType === "all" || property.type === propertyType;
+      const matchesSearch =
+        searchQuery === "" ||
+        property.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        property.location.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesLocation =
+        location === "" ||
+        property.location.toLowerCase().includes(location.toLowerCase());
+      const matchesBedrooms = bedrooms === 0 || property.bedrooms >= bedrooms;
+      const matchesBathrooms =
+        bathrooms === 0 || property.bathrooms >= bathrooms;
+
+      return (
+        matchesPrice &&
+        matchesType &&
+        matchesSearch &&
+        matchesLocation &&
+        matchesBedrooms &&
+        matchesBathrooms
+      );
+    });
+  }, [
+    priceRange,
+    propertyType,
+    searchQuery,
+    location,
+    bedrooms,
+    bathrooms,
+    amenities,
+  ]);
+
+  // Reset current index when filters change
+  React.useEffect(() => {
+    setCurrentIndex(0);
+  }, [filteredProperties]);
+
+  const currentProperty = filteredProperties[currentIndex];
+
+  // If no properties match the filters, show a message
+  if (filteredProperties.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No properties match your filters</Text>
+        <Text style={styles.emptySubText}>
+          Try adjusting your filters or search criteria
+        </Text>
+        <FAB
+          icon="filter"
+          style={styles.filterFab}
+          onPress={() => navigation.navigate("Filter")}
+        />
+      </View>
+    );
+  }
 
   const gesture = Gesture.Pan()
     .onUpdate((event) => {
@@ -65,7 +200,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         }
 
         setTimeout(() => {
-          setCurrentIndex((prev) => (prev + 1) % mockProperties.length);
+          setCurrentIndex((prev) => (prev + 1) % filteredProperties.length);
           translateX.value = withSpring(0);
           translateY.value = withSpring(0);
         }, 300);
@@ -134,14 +269,22 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               style={styles.propertyImage}
               resizeMode="cover"
             />
+            <View style={styles.imageOverlay} />
           </View>
-          <View style={styles.infoContainer}>
+          <Surface style={styles.infoContainer}>
             <View style={styles.titleContainer}>
               <Text style={styles.title}>{currentProperty.title}</Text>
-              <Text style={styles.price}>{currentProperty.price}</Text>
+              <Text style={styles.price}>{currentProperty.price}/month</Text>
             </View>
             <Text style={styles.location}>{currentProperty.location}</Text>
-          </View>
+            <View style={styles.detailsContainer}>
+              <Text style={styles.details}>
+                {currentProperty.bedrooms} beds • {currentProperty.bathrooms}{" "}
+                baths
+              </Text>
+              <Text style={styles.type}>{currentProperty.type}</Text>
+            </View>
+          </Surface>
         </Animated.View>
       </GestureDetector>
 
@@ -158,12 +301,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           icon="close"
           size={30}
           mode="contained"
-          containerColor="#ff4444"
+          containerColor="#FF3366"
           iconColor="white"
           onPress={() => {
             translateX.value = withSpring(-SCREEN_WIDTH);
             setTimeout(() => {
-              setCurrentIndex((prev) => (prev + 1) % mockProperties.length);
+              setCurrentIndex((prev) => (prev + 1) % filteredProperties.length);
               translateX.value = withSpring(0);
             }, 300);
           }}
@@ -172,25 +315,18 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           icon="heart"
           size={30}
           mode="contained"
-          containerColor="#4CAF50"
+          containerColor="#00D4FF"
           iconColor="white"
           onPress={() => {
             translateX.value = withSpring(SCREEN_WIDTH);
             addLikedProperty(currentProperty);
             setTimeout(() => {
-              setCurrentIndex((prev) => (prev + 1) % mockProperties.length);
+              setCurrentIndex((prev) => (prev + 1) % filteredProperties.length);
               translateX.value = withSpring(0);
             }, 300);
           }}
         />
       </View>
-
-      <FAB
-        icon="heart"
-        style={styles.fab}
-        onPress={() => navigation.navigate("SavedProperties")}
-        label={`${likedProperties.length}`}
-      />
     </View>
   );
 }
@@ -198,62 +334,80 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#FFFFFF",
   },
   card: {
     position: "absolute",
     width: SCREEN_WIDTH * 0.9,
     height: "80%",
     alignSelf: "center",
-    backgroundColor: "white",
-    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   imageContainer: {
     flex: 3,
-    backgroundColor: "#e0e0e0",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: "#F8F9FA",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  propertyImage: {
+    width: "100%",
+    height: "100%",
   },
   infoContainer: {
     flex: 1,
-    padding: 20,
+    padding: 24,
+    backgroundColor: "#FFFFFF",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   titleContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 8,
   },
   title: {
     fontSize: 24,
-    fontWeight: "bold",
+    fontWeight: "600",
+    color: "#1A1A1A",
   },
   price: {
     fontSize: 20,
-    color: "#f4511e",
+    fontWeight: "600",
+    color: "#FF3366",
   },
   location: {
     fontSize: 16,
-    color: "#666",
-    marginTop: 5,
+    color: "#666666",
+    marginBottom: 12,
   },
-  fab: {
-    position: "absolute",
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#f4511e",
+  detailsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  propertyImage: {
-    width: "100%",
-    height: "100%",
+  details: {
+    fontSize: 14,
+    color: "#666666",
+  },
+  type: {
+    fontSize: 14,
+    color: "#00D4FF",
+    textTransform: "capitalize",
   },
   likeContainer: {
     position: "absolute",
@@ -271,16 +425,16 @@ const styles = StyleSheet.create({
   },
   likeText: {
     borderWidth: 4,
-    borderColor: "#4CAF50",
-    color: "#4CAF50",
+    borderColor: "#00D4FF",
+    color: "#00D4FF",
     fontSize: 32,
     fontWeight: "bold",
     padding: 10,
   },
   dislikeText: {
     borderWidth: 4,
-    borderColor: "#ff4444",
-    color: "#ff4444",
+    borderColor: "#FF3366",
+    color: "#FF3366",
     fontSize: 32,
     fontWeight: "bold",
     padding: 10,
@@ -292,5 +446,30 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     width: "100%",
     paddingHorizontal: 20,
+  },
+  filterFab: {
+    position: "absolute",
+    margin: 16,
+    right: 80,
+    bottom: 0,
+    backgroundColor: "#666",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#666",
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 16,
+    color: "#999",
+    textAlign: "center",
+    marginBottom: 20,
   },
 });
