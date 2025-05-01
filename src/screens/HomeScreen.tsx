@@ -1,5 +1,12 @@
-import React, { useState, useMemo } from "react";
-import { StyleSheet, View, Dimensions, Text, Image } from "react-native";
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  StyleSheet,
+  View,
+  Dimensions,
+  Text,
+  Image,
+  AccessibilityInfo,
+} from "react-native";
 import { FAB, IconButton, Surface } from "react-native-paper";
 import Animated, {
   useAnimatedStyle,
@@ -90,7 +97,27 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     amenities,
   } = useFilter();
 
-  // Add header filter button
+  // Add accessibility features
+  const [isScreenReaderEnabled, setIsScreenReaderEnabled] = useState(false);
+
+  useEffect(() => {
+    const checkScreenReader = async () => {
+      const isEnabled = await AccessibilityInfo.isScreenReaderEnabled();
+      setIsScreenReaderEnabled(isEnabled);
+    };
+
+    checkScreenReader();
+    const subscription = AccessibilityInfo.addEventListener(
+      "screenReaderChanged",
+      setIsScreenReaderEnabled
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Add header configuration with accessibility
   React.useLayoutEffect(() => {
     navigation.setOptions({
       headerStyle: {
@@ -108,12 +135,18 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             iconColor="#fff"
             size={24}
             onPress={() => navigation.navigate("SavedProperties")}
+            accessibilityLabel="View saved properties"
+            accessibilityHint="Opens your list of saved properties"
+            accessibilityRole="button"
           />
           <IconButton
             icon="filter-variant"
             iconColor="#fff"
             size={24}
             onPress={() => navigation.navigate("Filter")}
+            accessibilityLabel="Filter properties"
+            accessibilityHint="Opens property filter options"
+            accessibilityRole="button"
           />
         </View>
       ),
@@ -173,10 +206,16 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <Text style={styles.emptySubText}>
           Try adjusting your filters or search criteria
         </Text>
-        <FAB
+        <IconButton
           icon="filter"
-          style={styles.filterFab}
+          size={24}
+          mode="contained"
+          containerColor="#FF3366"
+          iconColor="white"
           onPress={() => navigation.navigate("Filter")}
+          accessibilityLabel="Open filters"
+          accessibilityHint="Opens property filter options"
+          accessibilityRole="button"
         />
       </View>
     );
@@ -262,12 +301,19 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   return (
     <View style={styles.container}>
       <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.card, animatedStyle]}>
+        <Animated.View
+          style={[styles.card, animatedStyle]}
+          accessible={true}
+          accessibilityLabel={`${currentProperty.title}, ${currentProperty.price} per month, ${currentProperty.bedrooms} bedrooms, ${currentProperty.bathrooms} bathrooms, located in ${currentProperty.location}`}
+          accessibilityRole="button"
+          accessibilityHint="Swipe right to like, left to dislike"
+        >
           <View style={styles.imageContainer}>
             <Image
               source={{ uri: currentProperty.image }}
               style={styles.propertyImage}
               resizeMode="cover"
+              accessibilityLabel={`Image of ${currentProperty.title}`}
             />
             <View style={styles.imageOverlay} />
           </View>
@@ -288,11 +334,19 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </Animated.View>
       </GestureDetector>
 
-      <Animated.View style={[styles.likeContainer, likeStyle]}>
+      <Animated.View
+        style={[styles.likeContainer, likeStyle]}
+        accessible={true}
+        accessibilityLabel="Like indicator"
+      >
         <Text style={styles.likeText}>LIKE</Text>
       </Animated.View>
 
-      <Animated.View style={[styles.dislikeContainer, dislikeStyle]}>
+      <Animated.View
+        style={[styles.dislikeContainer, dislikeStyle]}
+        accessible={true}
+        accessibilityLabel="Dislike indicator"
+      >
         <Text style={styles.dislikeText}>NOPE</Text>
       </Animated.View>
 
@@ -310,6 +364,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               translateX.value = withSpring(0);
             }, 300);
           }}
+          accessibilityLabel="Dislike property"
+          accessibilityHint="Swipe left to dislike this property"
+          accessibilityRole="button"
         />
         <IconButton
           icon="heart"
@@ -325,6 +382,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               translateX.value = withSpring(0);
             }, 300);
           }}
+          accessibilityLabel="Like property"
+          accessibilityHint="Swipe right to like this property"
+          accessibilityRole="button"
         />
       </View>
     </View>
@@ -384,16 +444,19 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "600",
     color: "#1A1A1A",
+    letterSpacing: 0.5,
   },
   price: {
     fontSize: 20,
     fontWeight: "600",
     color: "#FF3366",
+    letterSpacing: 0.5,
   },
   location: {
     fontSize: 16,
     color: "#666666",
     marginBottom: 12,
+    letterSpacing: 0.5,
   },
   detailsContainer: {
     flexDirection: "row",
@@ -403,11 +466,13 @@ const styles = StyleSheet.create({
   details: {
     fontSize: 14,
     color: "#666666",
+    letterSpacing: 0.5,
   },
   type: {
     fontSize: 14,
     color: "#00D4FF",
     textTransform: "capitalize",
+    letterSpacing: 0.5,
   },
   likeContainer: {
     position: "absolute",
@@ -430,6 +495,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     padding: 10,
+    letterSpacing: 1,
   },
   dislikeText: {
     borderWidth: 4,
@@ -438,6 +504,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     padding: 10,
+    letterSpacing: 1,
   },
   buttonContainer: {
     position: "absolute",
